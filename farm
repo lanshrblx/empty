@@ -25,7 +25,8 @@ local current_farm_task = nil
 local TG_LINK = "https://t.me/+xLlUKw5U2IcyZjBi"
 
 local function createGUI()
-	local path = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
+	game:GetService("CoreGui"):WaitForChild('TopBarApp'):WaitForChild('TopBarApp').Enabled = false
+	local path = game:GetService("CoreGui")
 	
 	local ScreenGui = Instance.new("ScreenGui")
 	ScreenGui.Parent = path
@@ -167,8 +168,6 @@ local function createGUI()
 	CloseButton:WaitForChild("TextButton").MouseButton1Click:Connect(function()
 		CloseButton:WaitForChild("CanvasGroup"):WaitForChild("Rounded_frame").BackgroundTransparency = 0.5
 		CloseButton:WaitForChild("CanvasGroup"):WaitForChild("Rounded_frame").Size = UDim2.new(1,0,1,0)
-		local tween = TS:Create(CloseButton:WaitForChild("CanvasGroup"):WaitForChild("Rounded_frame"), TweenInfo.new(0.5), {BackgroundTransparency = 1, Size = UDim2.new(4,0,4,0)})
-		tween:Play()
 		task.wait(0.5)
 		ScreenGui.Enabled = false
 	end)
@@ -176,8 +175,6 @@ local function createGUI()
 	TextButton.MouseButton1Click:Connect(function()
 		Rounded_frame.BackgroundTransparency = 0.5
 		Rounded_frame.Size = UDim2.new(1,0,1,0)
-		local tween = TS:Create(Rounded_frame, TweenInfo.new(0.5), {BackgroundTransparency = 1, Size = UDim2.new(4,0,4,0)})
-		tween:Play()
 		Link:WaitForChild("TextButton"):WaitForChild("Description").Text = "🔗 Link copied to clipboard"
 		setclipboard(tostring(TG_LINK))
 		task.wait(1)
