@@ -1,4 +1,5 @@
 --services
+local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TS = game:GetService("TweenService")
 
@@ -358,3 +359,5 @@ end)
 game:GetService("Players").LocalPlayer.Idled:connect(function()
 	game:GetService("VirtualUser"):ClickButton2(Vector2.new())
 end)
+
+RunService:Set3dRenderingEnabled(false)
