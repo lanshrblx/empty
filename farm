@@ -12,7 +12,6 @@ local MAX_TWEEN_TIME = 10
 local CoinCollected = game:GetService("ReplicatedStorage").Remotes.Gameplay.CoinCollected
 local RoundStart = game:GetService("ReplicatedStorage").Remotes.Gameplay.RoundStart
 local RoundEnded = game:GetService("ReplicatedStorage").Remotes.Gameplay.VictoryScreen
-local RoleSelect = game:GetService("ReplicatedStorage").Remotes.Gameplay.RoleSelect
 
 --config
 local config = {
@@ -214,6 +213,26 @@ local function getTweenTime(targetPos)
 	return time
 end
 
+local function getInvetoryCoins()
+	local remote = game:GetService("ReplicatedStorage").Remotes.Extras.GetFullInventory
+	local args = {
+	    [1] = game:GetService("Players").LocalPlayer.Name
+	}
+
+	local results = remote:InvokeServer(unpack(args))
+	return results["Materials"]["Owned"]["Coins"]
+end
+
+local function openCase()
+    local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Shop"):WaitForChild("OpenCrate")
+    local args = {
+      "MysteryBox2",
+      "MysteryBox",
+      "Coins"
+    }
+    local result = {remote:InvokeServer(unpack(args))}
+end
+
 local function CoinFarm(config)
 
 	local reset_after = config["reset_after"] == true
@@ -297,22 +316,14 @@ local function CoinFarm(config)
     		task.wait()  -- НЕ БЛОКИРУЕТ
 		end
 
+        if getInvetoryCoins()>10 then
+            openCase()
+        end
+
 		task.wait(0.25)
 	end
 
 end
-
-local function getInvetoryCoins()
-	local remote = game:GetService("ReplicatedStorage").Remotes.Extras.GetFullInventory
-	local args = {
-	    [1] = game:GetService("Players").LocalPlayer.Name
-	}
-
-	local results = remote:InvokeServer(unpack(args))
-	return results["Materials"]["Owned"]["Coins"]
-end
-
-local role = nil
 
 local function stopFarming()
 	stop_farming_flag = true
@@ -326,7 +337,6 @@ local function startFarming()
 	stop_farming_flag = false
 	current_farm_task = task.spawn(function()
 		CoinFarm(config)
-
 	end)
 end
 
@@ -350,6 +360,7 @@ end
 --player dead event
 game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
 	balance_object.Text = "💰 Balance: " .. tostring(getInvetoryCoins())
+    
 	char:WaitForChild("Humanoid").Died:Connect(function()
 		stopFarming()
 	end)
