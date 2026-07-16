@@ -39,7 +39,7 @@ local function stealBuild(victim)
 	local victim_house = workspace.HouseInteriors
 	local victim_house_pos = victim_house.blueprint:WaitForChild(victim).PrimaryPart.CFrame.Position
 
-	task.wait(2)
+	task.wait(30)
 
 	local function saveBuilding()
 		local data = {}
