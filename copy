@@ -1,0 +1,285 @@
+-- Создаем ScreenGui
+local function stealBuild(victim)
+	local victim = victim
+	local me = game.Players.LocalPlayer.Name
+
+	local furnitureDB = game:GetService("ReplicatedStorage"):WaitForChild("ClientDB"):WaitForChild("Housing"):WaitForChild("FurnitureDB")
+	local FurnitureDB = require(furnitureDB)
+
+	local function getFurnitureId(requested)
+		for id, table in pairs(FurnitureDB) do
+			if table.model_name == requested then
+				if table.can_use_in_house then
+					return id
+				end
+			end
+		end
+		return nil
+	end
+
+	local function teleportToHouse(name)
+		local args = {
+			game:GetService("Players"):WaitForChild(name)
+		}
+		game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("HousingAPI/SubscribeToHouse"):FireServer(unpack(args))
+
+		local args = {
+			{}
+		}
+		game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("HousingAPI/PushFurnitureChanges"):FireServer(unpack(args))
+
+		local args = {
+			"housing",
+			game:GetService("Players"):WaitForChild(name)
+		}
+		game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("LocationAPI/SetLocation"):FireServer(unpack(args))
+	end
+
+	teleportToHouse(victim)
+	local victim_house = workspace.HouseInteriors
+	local victim_house_pos = victim_house.blueprint:WaitForChild(victim).PrimaryPart.CFrame.Position
+
+	task.wait(2)
+
+	local function saveBuilding()
+		local data = {}
+
+		for _, folder in victim_house:WaitForChild('furniture'):GetChildren() do
+			local furniture_model = folder:FindFirstChildOfClass('Model')
+			local model = {}
+			model["id"] = getFurnitureId(furniture_model.Name)
+			model["model"]=furniture_model
+			local parts = {}
+			for _, child in furniture_model:GetChildren() do
+				if child.Name == "PlacementBlock" then
+					local ChildCF = child.CFrame
+					local pos_diff = Vector3.new(ChildCF.Position.X-victim_house_pos.X,
+						ChildCF.Position.Y-victim_house_pos.Y,
+						ChildCF.Position.Z-victim_house_pos.Z)
+					local model_cf = CFrame.new(pos_diff.X, pos_diff.Y, pos_diff.Z)
+					local model_rotation = child.Rotation
+					model["requested_size"]=child.Size
+					model["cf"]=model_cf
+					model["rot"]=model_rotation
+				end
+				if child.ClassName == "Part" or child.ClassName == "MeshPart" or child.ClassName == "UnionOperation" then
+					if child.Transparency == 1 then continue end
+					local colorValue = child.Color
+
+					local ChildCF = child.CFrame
+					local pos_diff = Vector3.new(ChildCF.Position.X-victim_house_pos.X,
+						ChildCF.Position.Y-victim_house_pos.Y,
+						ChildCF.Position.Z-victim_house_pos.Z)
+					local model_cf = CFrame.new(pos_diff.X, pos_diff.Y, pos_diff.Z,
+						ChildCF.RightVector.X, ChildCF.RightVector.Y, ChildCF.RightVector.Z,
+						ChildCF.UpVector.X, ChildCF.UpVector.Y, ChildCF.UpVector.Z,
+						ChildCF.LookVector.X, ChildCF.LookVector.Y, ChildCF.LookVector.Z)
+					local args = {
+						['name']=child.Name,
+						['cf']=model_cf,
+						['color']=child.Color
+					}
+
+					table.insert(parts, args)
+
+				end
+
+			end
+			model["parts"]=parts
+			table.insert(data, model)
+		end
+
+		return data
+	end
+
+
+	local stolen_building = saveBuilding()
+	print('Copied', #stolen_building)
+
+	teleportToHouse(me)
+	local player_house_pos = workspace.HouseInteriors.blueprint:WaitForChild(me).PrimaryPart.CFrame.Position
+	local my_house = workspace.HouseInteriors.furniture
+
+	for _, v in pairs(stolen_building) do
+		local function roundCF(CF, decimals)
+			local mult = 10 ^ (decimals or 0)
+			local res = CFrame.new(math.round(CF.X * mult) / mult, math.round(CF.Y * mult) / mult, math.round(CF.Z * mult) / mult)
+			return res
+		end
+
+		local function recolorModel(v, target, unique)
+			local targetDefaultColors = string.split(target:GetAttribute("DefaultFurnitureColors"), ',')
+			local targetGroupParts = {}
+			local sourceGroupParts = {}
+
+			for i, v in pairs(targetDefaultColors) do
+				targetDefaultColors[i] = Color3.fromHex(v)
+			end
+
+			for i, v in pairs(target:GetChildren()) do
+				if v:IsA("BasePart") or v:IsA("MeshPart") or v:IsA("UnionOperation") then
+					if v.Transparency == 1 then continue end
+					local color = v.Color
+					for groupId, color in pairs(targetDefaultColors) do
+						if v.Color == color then
+							if not targetGroupParts[groupId] then targetGroupParts[groupId] = {} end
+							table.insert(targetGroupParts[groupId], v)
+						end
+					end
+				end
+			end
+
+			for i, part in pairs(v.parts) do
+				local color = part.color:ToHex()
+				if not sourceGroupParts[color] then
+					sourceGroupParts[color] = {}
+					table.insert(sourceGroupParts[color], part)
+				else
+					table.insert(sourceGroupParts[color], part)
+				end
+			end
+
+			local payload = {}
+
+			for group, tbl in pairs(targetGroupParts) do
+				for _, part in pairs(tbl) do
+					local mainbreakflag = false
+					local partCF = roundCF(part.CFrame.Position - player_house_pos, 2)
+					for sourceColor, sourcetbl in pairs(sourceGroupParts) do
+						local breakflag = false
+						for _, sourcePart in pairs(sourcetbl) do
+							local sourcePartCF = roundCF(sourcePart.cf.Position, 2)
+							if partCF == sourcePartCF then
+								payload[group] = Color3.fromHex(sourceColor)
+								breakflag = true
+								mainbreakflag = true
+								break
+							end
+						end
+						if breakflag then break end
+					end
+					if mainbreakflag then break end
+				end
+			end
+
+			local args = {
+				{
+					{
+						unique = unique,
+						colors = payload
+					}
+				}
+			}
+			game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("HousingAPI/PushFurnitureChanges"):FireServer(unpack(args))
+		end
+
+		local spawnedModel = nil
+		local gotUnique = Instance.new("BindableEvent")
+		local uniqueValue = nil
+		local connection, Primary
+		connection = my_house.ChildAdded:Connect(function(child)
+			child.ChildAdded:Connect(function(model)
+				spawnedModel = model
+				uniqueValue = spawnedModel:GetAttribute("furniture_unique")
+				v["unique"] = uniqueValue
+				Primary = spawnedModel:WaitForChild("PlacementBlock")
+				gotUnique:Fire()
+				connection:Disconnect()
+			end)
+		end)
+
+		local id = v.id
+		local pos = v.cf
+		local rot = v.rot
+		local scale = v.requested_size
+		local args = {
+			{
+				{
+					kind = id,
+					properties = {
+						cframe = CFrame.new()
+					}
+				}
+			}
+		}
+		local success = game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("HousingAPI/BuyFurnitures"):InvokeServer(unpack(args))
+
+		if not uniqueValue then
+			gotUnique.Event:Wait()
+		end
+		print("Unique is "..uniqueValue)
+
+		local args = {
+			{
+				{
+					scale = scale.X/Primary.Size.X,
+					unique = uniqueValue,
+					cframe = CFrame.new(pos.X, pos.Y, pos.Z)*CFrame.Angles(math.rad(rot.X), math.rad(rot.Y), math.rad(rot.Z))
+				}
+			}
+		}
+		game:GetService("ReplicatedStorage"):WaitForChild("API"):WaitForChild("HousingAPI/PushFurnitureChanges"):FireServer(unpack(args))
+
+		task.wait(1)
+		spawnedModel.PrimaryPart:GetPropertyChangedSignal("CFrame", recolorModel(v, spawnedModel, uniqueValue))
+	end
+end
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TextInputGUI"
+screenGui.Parent = game.CoreGui
+
+-- Создаем главный Frame
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0, 300, 0, 150)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -75)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BorderSizePixel = 0
+mainFrame.Parent = screenGui
+
+local drag = Instance.new("UIDragDetector")
+drag.Parent = mainFrame
+
+-- Заголовок
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 30)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundTransparency = 1
+title.Text = "Введите текст"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextScaled = true
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+
+-- Поле ввода текста
+local textBox = Instance.new("TextBox")
+textBox.Size = UDim2.new(0.8, 0, 0, 30)
+textBox.Position = UDim2.new(0.1, 0, 0.3, 0)
+textBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+textBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+textBox.PlaceholderText = "Введите текст..."
+textBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+textBox.Font = Enum.Font.Gotham
+textBox.TextSize = 16
+textBox.ClearTextOnFocus = false
+textBox.Parent = mainFrame
+
+-- Кнопка "Вывести в консоль"
+local button = Instance.new("TextButton")
+button.Size = UDim2.new(0.6, 0, 0, 35)
+button.Position = UDim2.new(0.2, 0, 0.65, 0)
+button.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.Text = "Скопировать дом"
+button.TextScaled = true
+button.Font = Enum.Font.GothamBold
+button.Parent = mainFrame
+
+-- Обработчик нажатия кнопки
+button.MouseButton1Click:Connect(function()
+	local text = textBox.Text
+	local plr = game:GetService("Players"):FindFirstChild(text)
+	if not plr then print("Игрок не найден") return end
+	
+	stealBuild(plr.Name)
+end)
