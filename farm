@@ -20,6 +20,7 @@ local FARM_TIME_DELAY = 36 --seconds
 local FARM_TIME = 72
 local PLACE_ID = game.PlaceId
 local PLACES_IDS = {2768379856, 1962086868, 8481844229, 6961824067}
+queue_on_teleport("loadstring(game:HttpGet('"..SCRIPT_SOURCE.."'))()")
 
 local function teleportOnRandomServer(PlaceId)
     local servers = {}
@@ -68,7 +69,6 @@ if PLACE_ID ~= MM2_ID then
         time-=1
     end
 
-    queue_on_teleport("loadstring(game:HttpGet('"..tostring(SCRIPT_SOURCE).."'))()")
     teleportOnRandomServer(MM2_ID)
 end
 
