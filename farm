@@ -6,7 +6,7 @@ local TS = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 
 RunService:Set3dRenderingEnabled(false)
-for _, obj in pairs(Players.LocalPlayer.PlayerGui:GetChildren()) do
+for _, obj in pairs(Players.LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
     obj:Destroy()
 end
 
