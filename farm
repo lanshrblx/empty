@@ -10,6 +10,7 @@ for _, obj in pairs(Players.LocalPlayer:WaitForChild("PlayerGui"):GetChildren())
     obj:Destroy()
 end
 
+
 print("Script injected, game: "..tostring(game.PlaceId))
 
 --locals
@@ -75,9 +76,9 @@ if PLACE_ID ~= MM2_ID then
 end
 
 --remotes
-local CoinCollected = game:GetService("ReplicatedStorage").Remotes.Gameplay.CoinCollected
-local RoundStart = game:GetService("ReplicatedStorage").Remotes.Gameplay.RoundStart
-local RoundEnded = game:GetService("ReplicatedStorage").Remotes.Gameplay.VictoryScreen
+local CoinCollected = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("CoinCollected")
+local RoundStart = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("RoundStart")
+local RoundEnded = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("VictoryScreen")
 
 --config
 local config = {
