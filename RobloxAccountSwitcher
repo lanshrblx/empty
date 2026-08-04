@@ -1,0 +1,24 @@
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+getgenv().file_name = player.Name .. ".txt"
+getgenv().content = "completed"
+
+while true do
+    local case_opened = _G['case_opened']
+    local got_event_rewards = _G['got_event_rewards']
+
+    if case_opened and got_event_rewards then
+        local s, e = pcall(function()
+            writefile(getgenv().file_name, getgenv().content)
+        end)
+        
+        if s then
+            break
+        end
+    end
+    
+    task.wait(1)
+end
+
+print("Script completed! File created.")
