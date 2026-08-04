@@ -1,0 +1,499 @@
+--services
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local TS = game:GetService("TweenService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService = game:GetService("HttpService")
+
+RunService:Set3dRenderingEnabled(false)
+for _, obj in pairs(Players.LocalPlayer:WaitForChild("PlayerGui"):GetChildren()) do
+    obj:Destroy()
+end
+
+print("Script injected, game: "..tostring(game.PlaceId))
+
+--locals
+local SCRIPT_SOURCE = "https://raw.githubusercontent.com/lanshrblx/empty/refs/heads/main/farm4"
+local SPEED = 15
+local MIN_TWEEN_TIME = 0.3
+local MAX_TWEEN_TIME = 10
+local MM2_ID = 142823291
+local FARM_TIME_DELAY = 36 --seconds
+local FARM_TIME = 7200
+local PLACE_ID = game.PlaceId
+local PLACES_IDS = {2768379856, 1962086868, 8481844229, 6961824067}
+
+local function teleportOnRandomServer(PlaceId)
+    local servers = {}
+	local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&excludeFullGames=true")
+	local body = HttpService:JSONDecode(req)
+
+	if body and body.data then
+		for i, v in next, body.data do
+			if type(v) == "table" and tonumber(v.playing) and tonumber(v.maxPlayers) and v.playing < v.maxPlayers and v.id ~= JobId then
+				table.insert(servers, 1, v.id)
+			end
+		end
+	end
+
+	if #servers > 0 then
+        queue_on_teleport("loadstring(game:HttpGet('"..SCRIPT_SOURCE.."'))()")
+		TeleportService:TeleportToPlaceInstance(PlaceId, servers[math.random(1, #servers)], Players.LocalPlayer)
+    end
+end
+
+if PLACE_ID ~= MM2_ID then
+    print("Not in mm2, delay before tp: "..FARM_TIME_DELAY.." sec")
+    local time = FARM_TIME_DELAY
+    local ScreenGui = Instance.new("ScreenGui")
+	ScreenGui.Parent = path
+	ScreenGui.Name = "FarmGui"
+	ScreenGui.Enabled = true
+	ScreenGui.IgnoreGuiInset = true
+	ScreenGui.ResetOnSpawn = false
+
+    local TextLabel = Instance.new("TextLabel")
+	TextLabel.Parent = ScreenGui
+	TextLabel.Name = "Description"
+	TextLabel.BackgroundTransparency = 1
+	TextLabel.BorderSizePixel = 0
+	TextLabel.Active = false
+	TextLabel.Size = UDim2.new(0.67, 0, 0.41, 0)
+	TextLabel.Font = Enum.Font.GothamMedium
+	TextLabel.FontFace.Weight = Enum.FontWeight.Medium
+	TextLabel.Text = "AFK"
+	TextLabel.TextColor3 = Color3.fromRGB(173,173,173)
+	TextLabel.TextScaled = true
+
+    while time~=0 do
+        TextLabel.Text = "AFK: "..tostring(time).." seconds."
+        task.wait(1)
+        time-=1
+    end
+
+    teleportOnRandomServer(MM2_ID)
+end
+
+--remotes
+local CoinCollected = game:GetService("ReplicatedStorage").Remotes.Gameplay.CoinCollected
+local RoundStart = game:GetService("ReplicatedStorage").Remotes.Gameplay.RoundStart
+local RoundEnded = game:GetService("ReplicatedStorage").Remotes.Gameplay.VictoryScreen
+
+--config
+local config = {
+	["reset_after"]=true,
+	["enable_account_switching"]=true, -- Включаем смену аккаунта
+	["min_coins_to_switch"]=1000 -- Минимальное количество монет для открытия кейса и смены аккаунта
+}
+
+--farm config locals
+local stop_farming_flag = false
+local current_farm_task = nil
+local account_switched = false -- Флаг, чтобы не переключать аккаунт несколько раз
+
+local TG_LINK = "https://t.me/+xLlUKw5U2IcyZjBi"
+
+-- Функция для записи файла в Workspace
+local function writeAccountFile()
+	if not getgenv().writefile then
+		warn("writefile function not available (executor may not support it)")
+		return false
+	end
+	
+	local player = Players.LocalPlayer
+	local file_name = player.Name .. ".txt"
+	local content = "completed"
+	
+	local success, errorMsg = pcall(function()
+		writefile(file_name, content)
+	end)
+	
+	if success then
+		print("Account file created: " .. file_name .. " with content: " .. content)
+		return true
+	else
+		warn("Failed to write account file: " .. tostring(errorMsg))
+		return false
+	end
+end
+
+-- Функция для переключения аккаунта (записывает файл для автопереключения)
+local function switchAccount()
+	if account_switched then
+		return -- Уже переключили аккаунт
+	end
+	
+	print("Attempting to switch account...")
+	local success = writeAccountFile()
+	
+	if success then
+		account_switched = true
+		stopFarming() -- Останавливаем фарм
+		print("Account switch file created successfully. Tool will now switch accounts.")
+	else
+		print("Failed to create account switch file. Trying again later...")
+	end
+end
+
+local function createGUI()
+	game:GetService("CoreGui"):WaitForChild('TopBarApp'):WaitForChild('TopBarApp').Enabled = false
+	local path = game:GetService("CoreGui")
+	
+	local ScreenGui = Instance.new("ScreenGui")
+	ScreenGui.Parent = path
+	ScreenGui.Name = "FarmGui"
+	ScreenGui.Enabled = true
+	ScreenGui.IgnoreGuiInset = true
+	ScreenGui.ResetOnSpawn = false
+	
+	local Frame = Instance.new("Frame")
+	Frame.Parent = ScreenGui
+	Frame.Name = "Background"
+	Frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	Frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Frame.Size = UDim2.new(1, 0, 1, 0)
+	Frame.BackgroundColor3 = Color3.fromRGB(16,16,16)
+	
+	local Frame_wrap = Instance.new("Frame")
+	Frame_wrap.Parent = Frame
+	Frame_wrap.Name = "Wrap"
+	Frame_wrap.AnchorPoint = Vector2.new(0.5, 0.5)
+	Frame_wrap.Position = UDim2.new(0.5, 0, 0.5, 0)
+	Frame_wrap.Size = UDim2.new(0.5, 0, 0.5, 0)
+	Frame_wrap.BackgroundTransparency = 1
+	
+	local UIListLayout_wrap_frame = Instance.new("UIListLayout")
+	UIListLayout_wrap_frame.Padding = UDim.new(0.05, 0)
+	UIListLayout_wrap_frame.FillDirection = Enum.FillDirection.Vertical
+	UIListLayout_wrap_frame.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout_wrap_frame.HorizontalFlex = Enum.UIFlexAlignment.Fill
+	UIListLayout_wrap_frame.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	UIListLayout_wrap_frame.ItemLineAlignment = Enum.ItemLineAlignment.Center
+	UIListLayout_wrap_frame.VerticalAlignment = Enum.VerticalAlignment.Center
+	UIListLayout_wrap_frame.VerticalFlex = Enum.UIFlexAlignment.Fill
+	UIListLayout_wrap_frame.Parent = Frame_wrap
+	
+	local Preset_frame = Instance.new("Frame")
+	Preset_frame.BackgroundColor3 = Color3.fromRGB(38,38,38)
+	Preset_frame.Size = UDim2.new(0.7, 0, 0.2, 0)
+	Preset_frame.Parent = Frame_wrap
+	Preset_frame.BorderSizePixel = 0
+	Preset_frame.Name = "total_coins"
+	
+	local UICorner = Instance.new("UICorner")
+	UICorner.CornerRadius = UDim.new(0.1, 0)
+	UICorner.Parent = Preset_frame
+	
+	local UIStroke = Instance.new("UIStroke")
+	UIStroke.Parent = Preset_frame
+	UIStroke.Thickness = 0.03
+	UIStroke.BorderStrokePosition = Enum.BorderStrokePosition.Inner
+	UIStroke.Color = Color3.fromRGB(71,71,71)
+	UIStroke.LineJoinMode = Enum.LineJoinMode.Round
+	UIStroke.StrokeSizingMode = Enum.StrokeSizingMode.ScaledSize
+	
+	local UIPadding = Instance.new("UIPadding")
+	UIPadding.PaddingBottom = UDim.new(0, 0)
+	UIPadding.PaddingLeft = UDim.new(0.035, 0)
+	UIPadding.PaddingRight = UDim.new(0.035, 0)
+	UIPadding.PaddingTop = UDim.new(0, 0)
+	UIPadding.Parent = Preset_frame
+	
+	local UIListLayout_Preset_frame = Instance.new("UIListLayout")
+	UIListLayout_Preset_frame.Padding = UDim.new(0, 0)
+	UIListLayout_Preset_frame.FillDirection = Enum.FillDirection.Horizontal
+	UIListLayout_Preset_frame.SortOrder = Enum.SortOrder.LayoutOrder
+	UIListLayout_Preset_frame.HorizontalFlex = Enum.UIFlexAlignment.Fill
+	UIListLayout_Preset_frame.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	UIListLayout_Preset_frame.ItemLineAlignment = Enum.ItemLineAlignment.Center
+	UIListLayout_Preset_frame.VerticalAlignment = Enum.VerticalAlignment.Center
+	UIListLayout_Preset_frame.VerticalFlex = Enum.UIFlexAlignment.None
+	UIListLayout_Preset_frame.Parent = Preset_frame
+	
+	local TextLabel = Instance.new("TextLabel")
+	TextLabel.Parent = Preset_frame
+	TextLabel.Name = "Description"
+	TextLabel.BackgroundTransparency = 1
+	TextLabel.BorderSizePixel = 0
+	TextLabel.Active = false
+	TextLabel.Size = UDim2.new(0.67, 0, 0.41, 0)
+	TextLabel.Font = Enum.Font.GothamMedium
+	TextLabel.FontFace.Weight = Enum.FontWeight.Medium
+	TextLabel.Text = "💰 Balance: 0"
+	TextLabel.TextColor3 = Color3.fromRGB(173,173,173)
+	TextLabel.TextScaled = true
+	
+	local Farmed_coins = Preset_frame:Clone()
+	Farmed_coins.Parent = Frame_wrap
+	Farmed_coins.Name = "Farmed_coins"
+	Farmed_coins:WaitForChild("Description").Text = "💸 Farmed Coins: 0"
+	
+	local Link = Preset_frame:Clone()
+	Link.Parent = Frame_wrap
+	Link.Name = "Link"
+	
+	local TextButton = Instance.new("TextButton")
+	TextButton.Parent = Link
+	TextButton.Active = false
+	TextButton.BackgroundTransparency = 1
+	TextButton.Size = UDim2.new(1, 0, 1, 0)
+	TextButton.Position = UDim2.new(0, 0, 0, 0)
+	TextButton.AutoButtonColor = false
+	
+	Link:WaitForChild("UIListLayout").Parent = TextButton
+	Link:WaitForChild("UIPadding").Parent = TextButton
+	Link:WaitForChild("Description").Text = "🔗 Developer TG Channel"
+	Link:WaitForChild("Description").Parent = TextButton
+	
+	local CanvasGroup = Instance.new("CanvasGroup")
+	CanvasGroup.Parent = Link
+	CanvasGroup.BackgroundTransparency = 1
+	CanvasGroup.BorderSizePixel = 0
+	CanvasGroup.Size = UDim2.new(1, 0, 1, 0)
+	CanvasGroup.Position = UDim2.new(0, 0, 0, 0)
+	
+	local Rounded_frame = Instance.new("Frame")
+	Rounded_frame.Parent = CanvasGroup
+	Rounded_frame.Name = "Rounded_frame"
+	Rounded_frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	Rounded_frame.BackgroundTransparency = 1
+	Rounded_frame.BorderSizePixel = 0
+	Rounded_frame.Size = UDim2.new(1, 0, 1, 0)
+	Rounded_frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	
+	local UICorner_Round = Instance.new("UICorner")
+	UICorner_Round.CornerRadius = UDim.new(1, 0)
+	UICorner_Round.Parent = Rounded_frame
+	
+	local UIAspectRatioConstraint = Instance.new("UIAspectRatioConstraint")
+	UIAspectRatioConstraint.Parent = Rounded_frame
+	UIAspectRatioConstraint.AspectRatio = 1
+	UIAspectRatioConstraint.AspectType = Enum.AspectType.FitWithinMaxSize
+	UIAspectRatioConstraint.DominantAxis = Enum.DominantAxis.Width
+	
+	local CloseButton = Link:Clone()
+	CloseButton.Parent = Frame_wrap
+	CloseButton.Name = "CloseButton"
+	CloseButton:WaitForChild("TextButton"):WaitForChild("Description").Text = "❌ Close UI"
+	
+	CloseButton:WaitForChild("TextButton").MouseButton1Click:Connect(function()
+		CloseButton:WaitForChild("CanvasGroup"):WaitForChild("Rounded_frame").BackgroundTransparency = 0.5
+		CloseButton:WaitForChild("CanvasGroup"):WaitForChild("Rounded_frame").Size = UDim2.new(1,0,1,0)
+		task.wait(0.5)
+		ScreenGui.Enabled = false
+	end)
+	
+	TextButton.MouseButton1Click:Connect(function()
+		Rounded_frame.BackgroundTransparency = 0.5
+		Rounded_frame.Size = UDim2.new(1,0,1,0)
+		Link:WaitForChild("TextButton"):WaitForChild("Description").Text = "🔗 Link copied to clipboard"
+		setclipboard(tostring(TG_LINK))
+		task.wait(1)
+		Link:WaitForChild("TextButton"):WaitForChild("Description").Text = "🔗 Developer TG Channel"
+	end)
+	
+	return TextLabel, Farmed_coins:WaitForChild("Description")
+end
+
+local balance_object, coins_object = createGUI()
+
+local function getSpawnCoordinates()
+	local path = workspace.RegularLobby.EliteBoard
+	return path.WorldPivot.Position
+end
+
+local function getHumanoid()
+	local hum = Players.LocalPlayer.Character:WaitForChild("Humanoid")
+	return hum
+end
+
+local function getRoot()
+	local root = Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+	return root
+end
+
+local function getTweenTime(targetPos)
+	local root = getRoot()
+	if not root then return MIN_TWEEN_TIME end
+
+	local currentPos = root.CFrame.Position
+	local distance = (currentPos - targetPos).Magnitude
+	local time = distance / SPEED
+
+	time = math.clamp(time, MIN_TWEEN_TIME, MAX_TWEEN_TIME)
+	return time
+end
+
+local function getInvetoryCoins()
+	local remote = game:GetService("ReplicatedStorage").Remotes.Extras.GetFullInventory
+	local args = {
+	    [1] = game:GetService("Players").LocalPlayer.Name
+	}
+
+	local results = remote:InvokeServer(unpack(args))
+	return results["Materials"]["Owned"]["Coins"]
+end
+
+local function openCase()
+    local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Shop"):WaitForChild("OpenCrate")
+    local args = {
+      "MysteryBox2",
+      "MysteryBox",
+      "Coins"
+    }
+    local result = {remote:InvokeServer(unpack(args))}
+    print("Case opened!")
+    return result
+end
+
+local function CoinFarm(config)
+
+	local reset_after = config["reset_after"] == true
+	local total_coins = 0
+	local limit_coins = 40
+	local is_collecting = false
+	local collected_coins = {}
+	local case_opened_this_round = false -- Флаг, чтобы не открывать кейс несколько раз за раунд
+
+	local function is_unique(coin)
+		for _, val in collected_coins do
+			if val == coin.CFrame then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function getClosestCoin()
+		local root = getRoot()
+		if not root then 
+			return nil 
+		end
+
+		local closest_coin = nil
+		local closest_distance = math.huge
+		local my_pos = root.CFrame.Position
+
+		for _, val in workspace:GetDescendants() do
+			if val and val.Name == "Coin_Server" and val.ClassName == "Part" and is_unique(val) and val:FindFirstChild("TouchInterest") then
+				local distance = (my_pos - val.CFrame.Position).Magnitude
+				if closest_distance > distance then
+					closest_coin = val
+					closest_distance = distance
+				end
+			end
+		end
+
+		return closest_coin
+	end
+
+	CoinCollected.OnClientEvent:Connect(function(got_type, got_total_coins, got_limit_coins, got_table)
+		total_coins = got_total_coins
+		limit_coins = got_limit_coins
+		is_collecting = false
+
+		if reset_after and total_coins == limit_coins then
+			local humanoid = getHumanoid()
+			humanoid.Health = 0
+		end
+	end)
+
+	while total_coins < limit_coins do
+		if stop_farming_flag then
+			break
+		end
+
+		if is_collecting then
+			task.wait(0.1)
+			is_collecting = false
+			continue
+		end
+
+		local coin = getClosestCoin()
+		if coin == nil then
+			task.wait(0.1)
+			continue
+		end
+
+		local tweenTime = getTweenTime(coin.CFrame.Position)
+
+		local tween = TS:Create(getRoot(), TweenInfo.new(tweenTime), {CFrame = coin.CFrame})
+		tween:Play()
+
+		is_collecting = true
+		table.insert(collected_coins, coin.CFrame)
+		coins_object.Text = "💸 Farmed Coins: "..tostring(#collected_coins)
+
+		while tween.PlaybackState ~= Enum.PlaybackState.Completed do
+    		task.wait()
+		end
+
+        -- Проверяем, нужно ли открыть кейс и переключить аккаунт
+        local current_coins = getInvetoryCoins()
+        if current_coins > config["min_coins_to_switch"] and not case_opened_this_round and config["enable_account_switching"] then
+            print("Coins: " .. current_coins .. " - opening case and switching account...")
+            openCase()
+            case_opened_this_round = true
+            
+            -- Даем время на открытие кейса и запись награды
+            task.wait(1)
+            
+            -- Переключаем аккаунт
+            switchAccount()
+            
+            -- Выходим из фарма
+            break
+        end
+
+		task.wait(0.25)
+	end
+
+end
+
+local function stopFarming()
+	stop_farming_flag = true
+	if current_farm_task then
+		task.cancel(current_farm_task)
+		current_farm_task = nil
+	end
+end
+
+local function startFarming()
+	stop_farming_flag = false
+	account_switched = false -- Сбрасываем флаг переключения аккаунта при новом фарме
+	current_farm_task = task.spawn(function()
+		CoinFarm(config)
+	end)
+end
+
+if RoundStart then
+	if game:GetService("RunService"):IsClient() then
+		RoundStart.OnClientEvent:Connect(function(round_len, round_data)
+			stopFarming()
+			task.wait(0.1)
+			startFarming()
+		end)
+	end
+end
+
+if RoundEnded and game:GetService("RunService"):IsClient() then
+	RoundEnded.OnClientEvent:Connect(function()
+		stopFarming()
+	end)
+end
+
+--player dead event
+game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
+	balance_object.Text = "💰 Balance: " .. tostring(getInvetoryCoins())
+    
+	char:WaitForChild("Humanoid").Died:Connect(function()
+		stopFarming()
+	end)
+end)
+
+--antiafk module
+game:GetService("Players").LocalPlayer.Idled:connect(function()
+	game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+end)
+
+print("Autofarm script loaded. Account switching enabled: " .. tostring(config["enable_account_switching"]))
