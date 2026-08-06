@@ -1,0 +1,329 @@
+--services
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local TeleportService = game:GetService("TeleportService")
+local TS = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+
+print("Script injected, game: "..tostring(game.PlaceId))
+
+--locals
+local SCRIPT_SOURCE = "https://raw.githubusercontent.com/lanshrblx/empty/refs/heads/main/farm7"
+local ACCOUNT_SWITCHER_SOURCE = "https://raw.githubusercontent.com/lanshrblx/empty/refs/heads/main/RobloxAccountSwitcher"
+local SPEED = 15
+local MIN_TWEEN_TIME = 0.3
+local MAX_TWEEN_TIME = 10
+local MM2_ID = 142823291
+local FARM_TIME_DELAY = 36 --seconds
+local PLACE_ID = game.PlaceId
+local PLACES_IDS = {2768379856, 1962086868, 8481844229, 6961824067}
+local function teleportOnRandomServer(PlaceId)
+    local servers = {}
+	local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&excludeFullGames=true")
+	local body = HttpService:JSONDecode(req)
+
+	if body and body.data then
+		for i, v in next, body.data do
+			if type(v) == "table" and tonumber(v.playing) and tonumber(v.maxPlayers) and v.playing < v.maxPlayers and v.id ~= JobId then
+				table.insert(servers, 1, v.id)
+			end
+		end
+	end
+
+	if #servers > 0 then
+        queue_on_teleport("loadstring(game:HttpGet('"..SCRIPT_SOURCE.."'))()")
+		TeleportService:TeleportToPlaceInstance(PlaceId, servers[math.random(1, #servers)], Players.LocalPlayer)
+    end
+end
+
+if PLACE_ID ~= MM2_ID then
+    print("Not in mm2, delay before tp: "..FARM_TIME_DELAY.." sec")
+    local time = FARM_TIME_DELAY
+
+    while time~=0 do
+        task.wait(1)
+        time-=1
+    end
+
+	_G.switch_account = true
+end
+
+--remotes
+local CoinCollected = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("CoinCollected")
+local RoundStart = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("RoundStart")
+local RoundEnded = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Gameplay"):WaitForChild("VictoryScreen")
+
+--config
+local config = {
+	["reset_after"]=true
+}
+
+--farm config locals
+local stop_farming_flag = false
+local current_farm_task = nil
+
+local TG_LINK = "https://t.me/+xLlUKw5U2IcyZjBi"
+
+
+local function getSpawnCoordinates()
+	local path = workspace.RegularLobby.EliteBoard
+	return path.WorldPivot.Position
+end
+
+local function getHumanoid()
+	local hum = Players.LocalPlayer.Character:WaitForChild("Humanoid")
+	return hum
+end
+
+local function getRoot()
+	local root = Players.LocalPlayer.Character:WaitForChild("HumanoidRootPart")
+	return root
+end
+
+local function getTweenTime(targetPos)
+	local root = getRoot()
+	if not root then return MIN_TWEEN_TIME end
+
+	local currentPos = root.CFrame.Position
+	local distance = (currentPos - targetPos).Magnitude
+	local time = distance / SPEED
+
+	time = math.clamp(time, MIN_TWEEN_TIME, MAX_TWEEN_TIME)
+	return time
+end
+
+local function getInvetoryCoins()
+	local remote = game:GetService("ReplicatedStorage").Remotes.Extras.GetFullInventory
+	local args = {
+	    [1] = game:GetService("Players").LocalPlayer.Name
+	}
+
+	local results = remote:InvokeServer(unpack(args))
+	return results["Materials"]["Owned"]["Coins"]
+end
+
+local function getSummerCoins()
+	local remote = game:GetService("ReplicatedStorage").Remotes.Extras.GetFullInventory
+	local args = {
+	    [1] = game:GetService("Players").LocalPlayer.Name
+	}
+
+	local results = remote:InvokeServer(unpack(args))
+	return results["Materials"]["Owned"]["SummerKey2026"]
+end
+
+local function openEventCase()
+	local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Shop"):WaitForChild("OpenCrate")
+	local args = {
+		"Summer2026Box",
+		"MysteryBox",
+		"SummerKey2026"
+	}
+    local result = {remote:InvokeServer(unpack(args))}
+end
+
+local function openCase()
+    local remote = game:GetService("ReplicatedStorage"):WaitForChild("Remotes"):WaitForChild("Shop"):WaitForChild("OpenCrate")
+    local args = {
+      "MysteryBox2",
+      "MysteryBox",
+      "Coins"
+    }
+    local result = {remote:InvokeServer(unpack(args))}
+end
+
+local function CoinFarm(config)
+	print("Farmim")
+	local reset_after = config["reset_after"] == true
+	local total_coins = 0
+	local limit_coins = 40
+	local is_collecting = false
+	local collected_coins = {}
+
+	local function is_unique(coin)
+		for _, val in collected_coins do
+			if val == coin.CFrame then
+				return false
+			end
+		end
+		return true
+	end
+
+	local function getClosestCoin()
+		local root = getRoot()
+		if not root then 
+			return nil 
+		end
+
+		local closest_coin = nil
+		local closest_distance = math.huge
+		local my_pos = root.CFrame.Position
+
+		for _, val in workspace:GetDescendants() do
+			if val and val.Name == "Coin_Server" and val.ClassName == "Part" and is_unique(val) and val:FindFirstChild("TouchInterest") then
+				local distance = (my_pos - val.CFrame.Position).Magnitude
+				if closest_distance > distance then
+					closest_coin = val
+					closest_distance = distance
+				end
+			end
+		end
+
+		return closest_coin
+	end
+
+	CoinCollected.OnClientEvent:Connect(function(got_type, got_total_coins, got_limit_coins, got_table)
+		total_coins = got_total_coins
+		limit_coins = got_limit_coins
+		is_collecting = false
+
+		if reset_after and total_coins == limit_coins then
+			local humanoid = getHumanoid()
+			humanoid.Health = 0
+		end
+	end)
+
+
+	while total_coins < limit_coins do
+		-- ДОБАВЛЕНО: проверка флага остановки
+		if stop_farming_flag then
+			break
+		end
+
+		if is_collecting then
+			task.wait(0.1)
+			is_collecting = false
+			continue
+		end
+
+		local coin = getClosestCoin()
+		if coin == nil then
+			task.wait(0.1)
+			continue
+		end
+
+		local tweenTime = getTweenTime(coin.CFrame.Position)
+
+		local tween = TS:Create(getRoot(), TweenInfo.new(tweenTime), {CFrame = coin.CFrame})
+		tween:Play()
+
+		is_collecting = true
+		table.insert(collected_coins, coin.CFrame)
+
+		while tween.PlaybackState ~= Enum.PlaybackState.Completed do
+    		task.wait()  -- НЕ БЛОКИРУЕТ
+		end
+
+		task.wait(0.25)
+	end
+
+end
+
+local function stopFarming()
+	stop_farming_flag = true
+	if current_farm_task then
+		task.cancel(current_farm_task)
+		current_farm_task = nil
+	end
+end
+
+local function startFarming()
+	stop_farming_flag = false
+	current_farm_task = task.spawn(function()
+		CoinFarm(config)
+	end)
+end
+
+if RoundStart then
+	if game:GetService("RunService"):IsClient() then
+		RoundStart.OnClientEvent:Connect(function(round_len, round_data)
+			-- ИЗМЕНЕНО: перезапускаем фарм при начале раунда
+			stopFarming()
+			task.wait(0.1)
+			startFarming()
+		end)
+	end
+end
+
+if RoundEnded and game:GetService("RunService"):IsClient() then
+	RoundEnded.OnClientEvent:Connect(function()
+		stopFarming()
+	end)
+end
+
+--player dead event
+game.Players.LocalPlayer.CharacterAdded:Connect(function(char)
+    
+	char:WaitForChild("Humanoid").Died:Connect(function()
+		stopFarming()
+	end)
+end)
+
+--antiafk module
+game:GetService("Players").LocalPlayer.Idled:connect(function()
+	game:GetService("VirtualUser"):ClickButton2(Vector2.new())
+end)
+
+local last_ex = 0
+local delay = 5
+
+local Start_value_coins = getInvetoryCoins()
+local Start_value_summer_coins = getSummerCoins()
+
+-- Счетчики заработанных монет за сессию
+local earned_coins = 0
+local earned_summer_coins = 0
+
+-- Предыдущие значения для отслеживания прироста
+local last_coins = Start_value_coins
+local last_summer_coins = Start_value_summer_coins
+
+-- Цели для смены сервера
+local COINS_GOAL = 1000
+local SUMMER_COINS_GOAL = 120
+
+RunService.Heartbeat:Connect(function(delta)
+    last_ex += delta
+    if last_ex < delay then return end
+    last_ex = 0
+
+    local current_coins = getInvetoryCoins()
+    local current_summer_coins = getSummerCoins()
+    
+    -- Отслеживаем прирост обычных монет
+    local delta_coins = current_coins - last_coins
+    if delta_coins > 0 then
+        earned_coins = earned_coins + delta_coins
+    end
+    
+    -- Отслеживаем прирост летних монет
+    local delta_summer = current_summer_coins - last_summer_coins
+    if delta_summer > 0 then
+        earned_summer_coins = earned_summer_coins + delta_summer
+    end
+    
+    -- Обновляем последние значения
+    last_coins = current_coins
+    last_summer_coins = current_summer_coins
+
+    -- Открываем кейсы если хватает
+    if current_coins >= 1000 then
+        openCase()
+    end
+
+    if current_summer_coins >= 120 then
+        openEventCase()
+    end
+
+    -- Проверяем заработанные монеты (не текущие в инвентаре)
+    if earned_coins >= COINS_GOAL and earned_summer_coins >= SUMMER_COINS_GOAL then
+		queue_on_teleport()
+        teleportOnRandomServer(PLACES_IDS[math.random(1, #PLACES_IDS)])
+        -- Сбрасываем счетчики после телепорта, чтобы не телепортироваться снова
+        earned_coins = 0
+        earned_summer_coins = 0
+    end
+end)
+
+
+loadstring(game:HttpGet(ACCOUNT_SWITCHER_SOURCE))()
