@@ -1,0 +1,427 @@
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local HttpService = game:GetService("HttpService")
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local Connections = {}
+local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+local Config = {
+    ItemForBuying = "Crate Of Avacados",
+    AmountForBuying = 5
+}
+
+if not queue_on_teleport then return end
+
+local function HopServer()
+    local PlaceId = game.PlaceId
+    local servers = {}
+	local req = game:HttpGet("https://games.roblox.com/v1/games/" .. PlaceId .. "/servers/Public?sortOrder=Desc&limit=100&excludeFullGames=true")
+	local body = HttpService:JSONDecode(req)
+
+	if body and body.data then
+		for i, v in next, body.data do
+			if type(v) == "table" and tonumber(v.playing) and tonumber(v.maxPlayers) and v.playing < v.maxPlayers and v.id ~= JobId then
+				table.insert(servers, 1, v.id)
+			end
+		end
+	end
+
+	if #servers > 0 then
+        queue_on_teleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/lanshrblx/empty/refs/heads/main/SBRP3'))()")
+		TeleportService:TeleportToPlaceInstance(PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+    end
+end
+
+Connections.DieHandler = LocalPlayer.CharacterAdded:Connect(function()
+    Character = LocalPlayer.Character
+    HopServer()
+end)
+
+local function CreatePoint(x,y,z,action)
+    return {
+        Pos = Vector3.new(x,y,z),
+        Action = action or nil
+    }
+end
+
+local LaundryPrompt
+for _,v in pairs(workspace.Gameplay.LaunderPrompts:GetChildren()) do
+    local cf = v.PrimaryPart.CFrame
+    if cf == CFrame.new(6805.7959, 18.093317, -34.3443565, 0, 0, 1, 0, 1, -0, -1, 0, 0) then
+        LaundryPrompt = v.PrimaryPart.LaunderBriefcasePrompt
+        break
+    end
+end
+--local BuyPrompt = workspace.Gameplay.WorldBuyableItems.CivilianArea["Mona Lisa Painting"].MonaLisaPaint.PromptAttachment.ProximityPrompt
+local BuyPrompt = workspace.Gameplay.WorldBuyableItems.CivilianArea["Crate Of Avacados"].Handle.PromptAttachment.ProximityPrompt
+local SellPrompt = workspace.Gameplay.NPC.Seller2.HumanoidRootPart.SellSmuggledGoodsPrompt
+
+local function DoLaundry()
+    while true do
+        fireproximityprompt(LaundryPrompt)
+
+        local Laundred = true
+        local Backpack = LocalPlayer.Backpack:GetChildren()
+        for _, item in pairs(Backpack) do
+            if item.Name == "Briefcase" then
+                Laundred = false
+            end
+        end
+
+        if Laundred then
+            print("Отмыто успешно, завершаем функцию")
+            break
+        end
+    end
+end
+
+local function DoBuy()
+    while true do
+        for AmountOfBought = 1, Config.AmountForBuying do
+            print("Покупаем 1 шт предметов")
+            fireproximityprompt(BuyPrompt)
+            task.wait(0.1)
+        end
+        
+        local CounterOfBoughtItems = 0
+        local Backpack = LocalPlayer.Backpack:GetChildren()
+        for _, item in pairs(Backpack) do
+            if item.Name == Config.ItemForBuying then
+                CounterOfBoughtItems+=1
+            end
+        end
+
+        if CounterOfBoughtItems == Config.AmountForBuying then
+            print("Куплено успешно, завершаем функцию")
+            break
+        end
+        print("Не куплено нужное колличество, стараемся купить снова")
+    end
+end
+
+local function DoSell()
+    while true do
+        fireproximityprompt(SellPrompt)
+
+        local CounterOfSoldItems = 0
+        local Backpack = LocalPlayer.Backpack:GetChildren()
+        for _, item in pairs(Backpack) do
+            if item.Name == Config.ItemForBuying then
+                CounterOfSoldItems+=1
+            end
+        end
+
+        if CounterOfSoldItems == 0 then
+            print("Продано успешно, завершаем функцию")
+            break
+        end
+        print("Проданы не все предметы, продаем снова")
+        task.wait(1)
+    end
+end
+
+local Points = {
+    [1] = CreatePoint(6858, 17, -37),
+    [2] = CreatePoint(6836, 17, -42),
+    [3] = CreatePoint(6807, 17, -35, DoLaundry),
+    [4] = CreatePoint(6836, 17, -42),
+    [5] = CreatePoint(6841, 17, -12),
+    [6] = CreatePoint(6838, 17, 12),
+    [7] = CreatePoint(6821, 17, 34, DoBuy),
+    [8] = CreatePoint(6787, 17, 40),
+    [9] = CreatePoint(6735, 21, 44),
+    [10] = CreatePoint(6674, 21, 52),
+    [11] = CreatePoint(6640, 20, 56),
+    [12] = CreatePoint(6613, 18, 63),
+    [13] = CreatePoint(6576, 17, 73),
+    [14] = CreatePoint(6536, 17, 77),
+    [15] = CreatePoint(6495, 17, 79),
+    [16] = CreatePoint(6450, 17, 85),
+    [17] = CreatePoint(6400, 17, 90),
+    [18] = CreatePoint(6350, 17, 95),
+    [19] = CreatePoint(6300, 17, 100),
+    [20] = CreatePoint(6250, 17, 105),
+    [21] = CreatePoint(6200, 17, 110),
+    [22] = CreatePoint(6150, 17, 115),
+    [23] = CreatePoint(6100, 17, 120),
+    [24] = CreatePoint(6050, 17, 125),
+    [25] = CreatePoint(6000, 17, 130),
+    [26] = CreatePoint(5950, 17, 135),
+    [27] = CreatePoint(5900, 17, 140),
+    [28] = CreatePoint(5850, 17, 145),
+    [29] = CreatePoint(5800, 17, 150),
+    [30] = CreatePoint(5750, 17, 155),
+    [31] = CreatePoint(5700, 17, 160),
+    [32] = CreatePoint(5650, 17, 160),
+    [33] = CreatePoint(5600, 17, 160),
+    [34] = CreatePoint(5550, 17, 160),
+    [35] = CreatePoint(5500, 17, 160),
+    [36] = CreatePoint(5450, 17, 160),
+    [37] = CreatePoint(5400, 17, 160),
+    [38] = CreatePoint(5350, 17, 160),
+    [39] = CreatePoint(5300, 17, 160),
+    [40] = CreatePoint(5250, 17, 160),
+    [41] = CreatePoint(5200, 17, 160),
+    [42] = CreatePoint(5150, 17, 160),
+    [43] = CreatePoint(5100, 17, 160),
+    [44] = CreatePoint(5050, 17, 160),
+    [45] = CreatePoint(5000, 17, 160),
+    [46] = CreatePoint(4950, 17, 160),
+    [47] = CreatePoint(4900, 17, 160),
+    [48] = CreatePoint(4850, 17, 160),
+    [49] = CreatePoint(4800, 17, 160),
+    [50] = CreatePoint(4750, 17, 160),
+    [51] = CreatePoint(4700, 17, 160),
+    [52] = CreatePoint(4650, 17, 160),
+    [53] = CreatePoint(4600, 17, 160),
+    [54] = CreatePoint(4550, 17, 160),
+    [55] = CreatePoint(4500, 17, 160),
+    [56] = CreatePoint(4450, 17, 160),
+    [57] = CreatePoint(4400, 17, 160),
+    [58] = CreatePoint(4350, 17, 160),
+    [59] = CreatePoint(4300, 17, 160),
+    [60] = CreatePoint(4250, 17, 160),
+    [61] = CreatePoint(4200, 17, 160),
+    [62] = CreatePoint(4150, 23, 200),
+    [63] = CreatePoint(4100, 28, 250),
+    [64] = CreatePoint(4050, 28, 255),
+    [65] = CreatePoint(4000, 32, 260),
+    [66] = CreatePoint(3950, 41, 265),
+    [67] = CreatePoint(3900, 44, 270),
+    [68] = CreatePoint(3850, 47, 275),
+    [69] = CreatePoint(3800, 44, 280),
+    [70] = CreatePoint(3750, 28, 285),
+    [71] = CreatePoint(3700, 26, 290),
+    [72] = CreatePoint(3650, 43, 295),
+    [73] = CreatePoint(3600, 33, 300),
+    [74] = CreatePoint(3550, 24, 305),
+    [75] = CreatePoint(3500, 30, 310),
+    [76] = CreatePoint(3450, 25, 315),
+    [77] = CreatePoint(3400, 20, 320),
+    [78] = CreatePoint(3350, 33, 325),
+    [79] = CreatePoint(3300, 22, 330),
+    [80] = CreatePoint(3250, 21, 335),
+    [81] = CreatePoint(3200, 22, 340),
+    [82] = CreatePoint(3150, 18, 345),
+    [83] = CreatePoint(3100, 18, 350),
+    [84] = CreatePoint(3050, 22, 355),
+    [85] = CreatePoint(3000, 19, 360),
+    [86] = CreatePoint(2950, 19, 365),
+    [87] = CreatePoint(2900, 24, 370),
+    [88] = CreatePoint(2850, 25, 375),
+    [89] = CreatePoint(2800, 24, 380),
+    [90] = CreatePoint(2750, 19, 385),
+    [91] = CreatePoint(2700, 21, 390),
+    [92] = CreatePoint(2650, 23, 395),
+    [93] = CreatePoint(2600, 20, 400),
+    [94] = CreatePoint(2550, 17, 405),
+    [95] = CreatePoint(2500, 18, 410),
+    [96] = CreatePoint(2450, 21, 415),
+    [97] = CreatePoint(2400, 21, 420),
+    [98] = CreatePoint(2350, 22, 425),
+    [99] = CreatePoint(2300, 23, 430),
+    [100] = CreatePoint(2250, 22, 435),
+    [101] = CreatePoint(2200, 25, 440),
+    [102] = CreatePoint(2150, 22, 445),
+    [103] = CreatePoint(2100, 17, 450),
+    [104] = CreatePoint(2050, 22, 455),
+    [105] = CreatePoint(2000, 33, 455),
+    [106] = CreatePoint(1950, 39, 455),
+    [107] = CreatePoint(1900, 41, 455),
+    [108] = CreatePoint(1850, 45, 455),
+    [109] = CreatePoint(1800, 43, 455),
+    [110] = CreatePoint(1750, 40, 455),
+    [111] = CreatePoint(1700, 38, 455),
+    [112] = CreatePoint(1650, 41, 455),
+    [113] = CreatePoint(1600, 41, 455),
+    [114] = CreatePoint(1550, 39, 455),
+    [115] = CreatePoint(1500, 38, 455),
+    [116] = CreatePoint(1450, 43, 455),
+    [117] = CreatePoint(1400, 44, 455),
+    [118] = CreatePoint(1350, 42, 455),
+    [119] = CreatePoint(1300, 44, 455),
+    [120] = CreatePoint(1250, 40, 455),
+    [121] = CreatePoint(1200, 42, 455),
+    [122] = CreatePoint(1150, 47, 455),
+    [123] = CreatePoint(1100, 49, 455),
+    [124] = CreatePoint(1050, 43, 455),
+    [125] = CreatePoint(1000, 34, 455),
+    [126] = CreatePoint(950, 27, 455),
+    [127] = CreatePoint(900, 26, 455),
+    [128] = CreatePoint(850, 25, 455),
+    [129] = CreatePoint(800, 20, 455),
+    [131] = CreatePoint(750, 17, 455),
+    [132] = CreatePoint(700, 18, 455),
+    [133] = CreatePoint(650, 20, 455),
+    [134] = CreatePoint(600, 21, 455),
+    [135] = CreatePoint(550, 21, 455),
+    [136] = CreatePoint(500, 24, 455),
+    [137] = CreatePoint(450, 25, 455),
+    [138] = CreatePoint(400, 25, 455),
+    [139] = CreatePoint(350, 29, 455),
+    [140] = CreatePoint(300, 17, 455),
+    [141] = CreatePoint(250, 17, 455),
+    [142] = CreatePoint(200, 17, 455),
+    [143] = CreatePoint(150, 17, 455),
+    [144] = CreatePoint(100, 19, 455),
+    [145] = CreatePoint(50, 19, 455),
+    [146] = CreatePoint(0, 33, 455),
+    [147] = CreatePoint(-50, 49, 455),
+    [148] = CreatePoint(-83, 49, 431, DoSell),
+    [149] = CreatePoint(-50, 49, 455),
+    [150] = CreatePoint(0, 33, 455),
+    [151] = CreatePoint(50, 19, 455),
+    [152] = CreatePoint(100, 19, 455),
+    [153] = CreatePoint(150, 17, 455),
+    [154] = CreatePoint(200, 17, 455),
+    [155] = CreatePoint(250, 17, 455),
+    [156] = CreatePoint(300, 17, 455),
+    [157] = CreatePoint(350, 29, 455),
+    [158] = CreatePoint(400, 25, 455),
+    [159] = CreatePoint(450, 25, 455),
+    [160] = CreatePoint(500, 24, 455),
+    [161] = CreatePoint(550, 21, 455),
+    [162] = CreatePoint(600, 21, 455),
+    [163] = CreatePoint(650, 20, 455),
+    [164] = CreatePoint(700, 18, 455),
+    [165] = CreatePoint(750, 17, 455),
+    [166] = CreatePoint(800, 20, 455),
+    [167] = CreatePoint(850, 25, 455),
+    [168] = CreatePoint(900, 26, 455),
+    [169] = CreatePoint(950, 27, 455),
+    [170] = CreatePoint(1000, 34, 455),
+    [171] = CreatePoint(1050, 43, 455),
+    [172] = CreatePoint(1100, 49, 455),
+    [173] = CreatePoint(1150, 47, 455),
+    [174] = CreatePoint(1200, 42, 455),
+    [175] = CreatePoint(1250, 40, 455),
+    [176] = CreatePoint(1300, 44, 455),
+    [177] = CreatePoint(1350, 42, 455),
+    [178] = CreatePoint(1400, 44, 455),
+    [179] = CreatePoint(1450, 43, 455),
+    [180] = CreatePoint(1500, 38, 455),
+    [181] = CreatePoint(1550, 39, 455),
+    [182] = CreatePoint(1600, 41, 455),
+    [183] = CreatePoint(1650, 41, 455),
+    [184] = CreatePoint(1700, 38, 455),
+    [185] = CreatePoint(1750, 40, 455),
+    [186] = CreatePoint(1800, 43, 455),
+    [187] = CreatePoint(1850, 45, 455),
+    [188] = CreatePoint(1900, 41, 455),
+    [189] = CreatePoint(1950, 39, 455),
+    [190] = CreatePoint(2000, 33, 455),
+    [191] = CreatePoint(2050, 22, 455),
+    [192] = CreatePoint(2100, 17, 450),
+    [193] = CreatePoint(2150, 22, 445),
+    [194] = CreatePoint(2200, 25, 440),
+    [195] = CreatePoint(2250, 22, 435),
+    [196] = CreatePoint(2300, 23, 430),
+    [197] = CreatePoint(2350, 22, 425),
+    [198] = CreatePoint(2400, 21, 420),
+    [199] = CreatePoint(2450, 21, 415),
+    [200] = CreatePoint(2500, 18, 410),
+    [201] = CreatePoint(2550, 17, 405),
+    [202] = CreatePoint(2600, 20, 400),
+    [203] = CreatePoint(2650, 23, 395),
+    [204] = CreatePoint(2700, 21, 390),
+    [205] = CreatePoint(2750, 19, 385),
+    [206] = CreatePoint(2800, 24, 380),
+    [207] = CreatePoint(2850, 25, 375),
+    [208] = CreatePoint(2900, 24, 370),
+    [209] = CreatePoint(2950, 19, 365),
+    [210] = CreatePoint(3000, 19, 360),
+    [211] = CreatePoint(3050, 22, 355),
+    [212] = CreatePoint(3100, 18, 350),
+    [213] = CreatePoint(3150, 18, 345),
+    [214] = CreatePoint(3200, 22, 340),
+    [215] = CreatePoint(3250, 21, 335),
+    [216] = CreatePoint(3300, 22, 330),
+    [217] = CreatePoint(3350, 33, 325),
+    [218] = CreatePoint(3400, 20, 320),
+    [219] = CreatePoint(3450, 25, 315),
+    [220] = CreatePoint(3500, 30, 310),
+    [221] = CreatePoint(3550, 24, 305),
+    [222] = CreatePoint(3600, 33, 300),
+    [223] = CreatePoint(3650, 43, 295),
+    [224] = CreatePoint(3700, 26, 290),
+    [225] = CreatePoint(3750, 28, 285),
+    [226] = CreatePoint(3800, 44, 280),
+    [227] = CreatePoint(3850, 47, 275),
+    [228] = CreatePoint(3900, 44, 270),
+    [229] = CreatePoint(3950, 41, 265),
+    [230] = CreatePoint(4000, 32, 260),
+    [231] = CreatePoint(4050, 28, 255),
+    [232] = CreatePoint(4100, 28, 250),
+    [233] = CreatePoint(4150, 23, 200),
+    [234] = CreatePoint(4200, 17, 160),
+    [235] = CreatePoint(4250, 17, 160),
+    [236] = CreatePoint(4300, 17, 160),
+    [237] = CreatePoint(4350, 17, 160),
+    [238] = CreatePoint(4400, 17, 160),
+    [239] = CreatePoint(4450, 17, 160),
+    [240] = CreatePoint(4500, 17, 160),
+    [241] = CreatePoint(4550, 17, 160),
+    [242] = CreatePoint(4600, 17, 160),
+    [243] = CreatePoint(4650, 17, 160),
+    [244] = CreatePoint(4700, 17, 160),
+    [245] = CreatePoint(4750, 17, 160),
+    [246] = CreatePoint(4800, 17, 160),
+    [247] = CreatePoint(4850, 17, 160),
+    [248] = CreatePoint(4900, 17, 160),
+    [249] = CreatePoint(4950, 17, 160),
+    [250] = CreatePoint(5000, 17, 160),
+    [251] = CreatePoint(5050, 17, 160),
+    [252] = CreatePoint(5100, 17, 160),
+    [253] = CreatePoint(5150, 17, 160),
+    [254] = CreatePoint(5200, 17, 160),
+    [255] = CreatePoint(5250, 17, 160),
+    [256] = CreatePoint(5300, 17, 160),
+    [257] = CreatePoint(5350, 17, 160),
+    [258] = CreatePoint(5400, 17, 160),
+    [259] = CreatePoint(5450, 17, 160),
+    [260] = CreatePoint(5500, 17, 160),
+    [261] = CreatePoint(5550, 17, 160),
+    [262] = CreatePoint(5600, 17, 160),
+    [263] = CreatePoint(5650, 17, 160),
+    [264] = CreatePoint(5700, 17, 160),
+    [265] = CreatePoint(5750, 17, 155),
+    [266] = CreatePoint(5800, 17, 150),
+    [267] = CreatePoint(5850, 17, 145),
+    [268] = CreatePoint(5900, 17, 140),
+    [269] = CreatePoint(5950, 17, 135),
+    [270] = CreatePoint(6000, 17, 130),
+    [271] = CreatePoint(6050, 17, 125),
+    [272] = CreatePoint(6100, 17, 120),
+    [273] = CreatePoint(6150, 17, 115),
+    [274] = CreatePoint(6200, 17, 110),
+    [275] = CreatePoint(6250, 17, 105),
+    [276] = CreatePoint(6300, 17, 100),
+    [277] = CreatePoint(6350, 17, 95),
+    [278] = CreatePoint(6400, 17, 90),
+    [279] = CreatePoint(6450, 17, 85),
+    [280] = CreatePoint(6495, 17, 79),
+    [281] = CreatePoint(6536, 17, 77),
+    [282] = CreatePoint(6576, 17, 73),
+    [283] = CreatePoint(6613, 18, 63),
+    [284] = CreatePoint(6640, 20, 56),
+    [285] = CreatePoint(6674, 21, 52),
+    [286] = CreatePoint(6735, 21, 44),
+    [287] = CreatePoint(6858, 17, -37),
+    [288] = CreatePoint(6787, 17, -19),
+    [289] = CreatePoint(6805, 17, -25)
+}
+
+for tasks = 1, 1 do
+    for num, point in pairs(Points) do
+        Character.PrimaryPart.CFrame = CFrame.new(point.Pos.X, point.Pos.Y, point.Pos.Z) 
+        if point.Action then
+            task.wait(1)
+            point.Action()
+        end
+        task.wait(0.25)
+    end
+end
+
+Connections = nil
